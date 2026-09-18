@@ -269,3 +269,25 @@ render();
 </script>
 </body>
 </html>
+<script type="module">
+  // Import Firebase functions from CDN
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCFjpNeYyZfY26xuhTaeNaXLWOp_jLClUo",
+    authDomain: "invoice-45406.firebaseapp.com",
+    projectId: "invoice-45406",
+    storageBucket: "invoice-45406.firebasestorage.app",
+    messagingSenderId: "764694111632",
+    appId: "1:764694111632:web:e25d931863dfaceb8e3f15",
+    measurementId: "G-64ENJX3B0S"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // Ready to connect your sales manager inputs to 'db'
+</script>
