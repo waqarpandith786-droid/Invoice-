@@ -33,7 +33,7 @@ footer{text-align:center;color:#7b8790;font-size:12px;padding:15px}
 </style>
 </head>
 <body>
-<header><div class="header"><h1>📊 My Sales Manager</h1><span id="status">Connecting to Cloud...</span></div></header>
+<header><div class="header"><h1>📊 My Sales Manager</h1><span id="status">Offline • Saved on this device</span></div></header>
 
 <div class="wrap">
 <section class="cards">
@@ -81,45 +81,19 @@ footer{text-align:center;color:#7b8790;font-size:12px;padding:15px}
 <tbody id="salesBody"></tbody></table>
 </div>
 </section>
-<footer>Your sales are stored securely in the cloud and sync across devices.</footer>
+<footer>Your sales are stored locally in your browser. Use Export Backup regularly to keep a copy.</footer>
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, set, remove, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCFjpNeYyZfY26xuhTaeNaXLWOp_jLClUo",
-  authDomain: "invoice-45406.firebaseapp.com",
-  projectId: "invoice-45406",
-  storageBucket: "invoice-45406.firebasestorage.app",
-  messagingSenderId: "764694111632",
-  appId: "1:764694111632:web:e25d931863dfaceb8e3f15",
-  measurementId: "G-64ENJX3B0S"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const salesRef = ref(db, 'sales');
-
-let sales = [];
-let editingId = null;
+<script>
+const KEY='my_sales_manager_v1';
+let sales=JSON.parse(localStorage.getItem(KEY)||'[]');
+let editingId=null;
 const $=id=>document.getElementById(id);
 const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const today=()=>new Date().toISOString().slice(0,10);
 $('date').value=today();
 
-// Listen for live database updates from Firebase across all devices
-onValue(salesRef, (snapshot) => {
-  const data = snapshot.val();
-  sales = data ? Object.values(data) : [];
-  $('status').textContent = 'Online • Synced with Cloud';
-  render();
-}, (error) => {
-  $('status').textContent = 'Offline • Sync Error';
-  console.error(error);
-});
-
+function save(){localStorage.setItem(KEY,JSON.stringify(sales));render();}
 function total(s){
   if(Array.isArray(s.items)) return s.items.reduce((sum,it)=>sum+Math.max(0,(Number(it.quantity)||0)*(Number(it.price)||0)-(Number(it.discount)||0)),0);
   return Math.max(0,(Number(s.quantity)||0)*(Number(s.price)||0)-(Number(s.discount)||0));
@@ -129,6 +103,7 @@ function itemList(s){
   return s.product ? [{product:s.product,quantity:s.quantity,price:s.price,discount:s.discount||0}] : [];
 }
 function itemSummary(s){return itemList(s).map(i=>i.product).filter(Boolean).join(', ')}
+
 
 function xesc(v){
   return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
@@ -186,8 +161,7 @@ function createXLSX(data){
   ];
   return zipStore(files);
 }
-
-window.printInvoice = function(id){
+function printInvoice(id){
   const s=sales.find(x=>x.id===id); if(!s)return;
   const invoiceNo='INV-'+String(s.id).slice(-8);
   const w=window.open('','_blank','width=800,height=700');
@@ -224,7 +198,7 @@ window.printInvoice = function(id){
   <div class="noprint" style="text-align:center;margin-top:15px"><button onclick="window.print()">Print Both Copies</button></div>
   </body></html>`);
   w.document.close();w.focus();
-};
+}
 
 function render(){
   const search=$('search').value.toLowerCase().trim(), fd=$('filterDate').value;
@@ -242,67 +216,35 @@ function render(){
   const revenue=sales.reduce((a,s)=>a+total(s),0);
   const todayRev=sales.filter(s=>s.date===today()).reduce((a,s)=>a+total(s),0);
   $('totalSales').textContent=sales.length;
-  $('totalRevenue').textContent=money(revenue);$('todayRevenue').textContent=money(todayRev);
+  $('totalRevenue').textContent=money(revenue);
+  $('todayRevenue').textContent=money(todayRev);
 }
 function escapeHtml(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
 
-$('saleForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const items=[];
-  for(let i=1;i<=6;i++){
-    const product=$('product'+i).value.trim(), quantity=Number($('quantity'+i).value)||0, price=Number($('price'+i).value)\vert{}\vert{}0, discount=Number($('discount'+i).value)||0;
-    if(product && quantity>0) items.push({product,quantity,price,discount});
-  }
-  if(!items.length){alert('Please enter at least one product/item with quantity.');return;}
-  
-  const saleId = editingId || Date.now().toString();
-  const item={
-    id: saleId,
-    customer: $('customer').value.trim(),
-    phone: $('phone').value.trim(),
-    date: $('date').value,
-    items,
-    product: itemSummary({items}),
-    payment: $('payment').value,
-    notes: $('notes').value.trim(),
-    created: editingId ? (sales.find(x=>x.id===editingId)?.created || Date.now()) : Date.now()
-  };
-
-  // Save directly to Firebase Realtime Database
-  set(ref(db, 'sales/' + saleId), item)
-    .then(() => {
-      resetForm();
-    })
-    .catch((error) => {
-      alert('Error saving to cloud: ' + error.message);
-    });
+$('saleForm').addEventListener('submit',e=>{
+ e.preventDefault();
+ const items=[];
+ for(let i=1;i<=6;i++){
+   const product=$('product'+i).value.trim(), quantity=Number($('quantity'+i).value)||0, price=Number($('price'+i).value)||0, discount=Number($('discount'+i).value)||0;
+   if(product && quantity>0) items.push({product,quantity,price,discount});
+ }
+ if(!items.length){alert('Please enter at least one product/item with quantity.');return;}
+ const item={id:editingId||Date.now().toString(),customer:$('customer').value.trim(),phone:$('phone').value.trim(),
+ date:$('date').value,items,product:itemSummary({items}),payment:$('payment').value,notes:$('notes').value.trim(),
+ created:editingId?(sales.find(x=>x.id===editingId)?.created||Date.now()):Date.now()};
+ if(editingId){sales=sales.map(s=>s.id===editingId?item:s)}else sales.push(item);
+ localStorage.setItem(KEY,JSON.stringify(sales)); resetForm(); render();
 });
-
-function resetForm(){
-  editingId=null;
-  $('saleForm').reset();$('date').value=today();
-  for(let i=1;i<=6;i++){
-    if($('quantity'+i))$('quantity'+i).value=i===1?1:0;
-    if($('discount'+i))$('discount'+i).value=0;   }$('formTitle').textContent='Add New Sale';
-  $('saveBtn').textContent='Save Sale';$('cancelBtn').style.display='none';
-}
+function resetForm(){editingId=null;$('saleForm').reset();$('date').value=today();for(let i=1;i<=6;i++){if($('quantity'+i))$('quantity'+i).value=i===1?1:0;if($('discount'+i))$('discount'+i).value=0;}$('formTitle').textContent='Add New Sale';$('saveBtn').textContent='Save Sale';$('cancelBtn').style.display='none';}
 $('cancelBtn').onclick=resetForm;
 
-window.editSale = function(id){
-  const s=sales.find(x=>x.id===id);if(!s)return;editingId=id;
-  ['customer','phone','date','payment','notes'].forEach(k=>$(k).value=s[k]||'');
-  for(let i=1;i<=6;i++){const it=itemList(s)[i-1]||{};$('product'+i).value=it.product||'';$('quantity'+i).value=it.quantity\vert{}\vert{}0;$('price'+i).value=it.price||0;$('discount'+i).value=it.discount\vert{}\vert{}0;}$('formTitle').textContent='Edit Sale';$('saveBtn').textContent='Update Sale';$('cancelBtn').style.display='inline-block';window.scrollTo({top:0,behavior:'smooth'});
+window.editSale=id=>{
+ const s=sales.find(x=>x.id===id);if(!s)return;editingId=id;
+ ['customer','phone','date','payment','notes'].forEach(k=>$(k).value=s[k]||'');
+ for(let i=1;i<=6;i++){const it=itemList(s)[i-1]||{};$('product'+i).value=it.product||'';$('quantity'+i).value=it.quantity||0;$('price'+i).value=it.price||0;$('discount'+i).value=it.discount||0;}
+ $('formTitle').textContent='Edit Sale';$('saveBtn').textContent='Update Sale';$('cancelBtn').style.display='inline-block';window.scrollTo({top:0,behavior:'smooth'});
 };
-
-window.deleteSale = function(id){
-  if(confirm('Delete this sale? This cannot be undone.')){
-    remove(ref(db, 'sales/' + id))
-      .catch((error) => {
-        alert('Error deleting from cloud: ' + error.message);
-      });
-  }
-};
-
+window.deleteSale=id=>{if(confirm('Delete this sale? This cannot be undone.')){sales=sales.filter(s=>s.id!==id);save();}};
 $('search').oninput=render;$('filterDate').oninput=render;
 $('clearFilter').onclick=()=>{$('search').value='';$('filterDate').value='';render()};
 
@@ -316,20 +258,14 @@ $('exportBtn').onclick=()=>{
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 };
-
-$('importBtn').onclick=()=>$('fileInput').click();$('fileInput').onchange=e=>{
+$('importBtn').onclick=()=>$('fileInput').click();
+$('fileInput').onchange=e=>{
  const file=e.target.files[0];if(!file)return;const r=new FileReader();
  r.onload=()=>{try{const data=JSON.parse(r.result);if(!Array.isArray(data))throw Error();
- if(confirm('Importing will replace the cloud sales database. Continue?')){
-   const updates = {};
-   data.forEach(item => {
-     if(!item.id) item.id = Date.now().toString() + Math.random();
-     updates[item.id] = item;
-   });
-   set(salesRef, updates).then(()=>alert('Cloud backup imported successfully.'));
- }
+ if(confirm('Importing will replace the sales currently saved in this browser. Continue?')){sales=data;save();alert('Backup imported successfully.');}
  }catch{alert('Invalid backup file.')} e.target.value='';};r.readAsText(file);
 };
+render();
 </script>
 </body>
 </html>
